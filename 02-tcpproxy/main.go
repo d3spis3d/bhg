@@ -1,43 +1,42 @@
 package main
 
 import (
-	"bufio"
+	"io"
 	"log"
 	"net"
 )
 
-func echo(conn net.Conn) {
-	defer conn.Close()
-
-	reader := bufio.NewReader(conn)
-	s, err := reader.ReadString('\n')
+func handle(src net.Conn) {
+	dst, err := net.Dial("tcp", ":8000")
 	if err != nil {
-		log.Fatalln("Unable to read data")
+		log.Fatalln("Unable to connect to unreachable host")
 	}
-	log.Printf("Read %d bytes: %s\n", len(s), s)
+	defer dst.Close()
 
-	log.Println("Writing data")
-	writer := bufio.NewWriter(conn)
-	if _, err := writer.WriteString(s); err != nil {
-		log.Fatalln("Unable to write data")
+	go func() {
+		if _, err := io.Copy(dst, src); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+	if _, err := io.Copy(src, dst); err != nil {
+		log.Fatalln(err)
 	}
-	writer.Flush()
 }
 
 func main() {
-	listener, err := net.Listen("tcp", ":20080")
+	listener, err := net.Listen("tcp", ":8899")
 	if err != nil {
 		log.Fatalln("Unable to bind to port")
 	}
-	log.Println("Listening on port 20080")
+	log.Println("Listening on port 8899")
 
 	for {
 		conn, err := listener.Accept()
-		log.Println("Received connection")
 		if err != nil {
 			log.Fatalln("Unable to accept connection")
 		}
-
-		go echo(conn)
+		go handle(conn)
 	}
+
 }
